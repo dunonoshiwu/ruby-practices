@@ -7,7 +7,7 @@ today = Date.today
 params = ARGV.getopts("", "y:#{today.year}","m:#{today.month}")
 
 # 引数なければ今日の日付が入ったオブジェクト使う
-if params["y"] == nil
+if params["y"] == nil && params["m"] == nil
   day = today
 else
   day = Date.new(params["y"].to_i, params["m"].to_i)
@@ -30,10 +30,8 @@ day_of_the_week = first_of_month.wday
 print "   " * day_of_the_week #ついたちが何曜日かでスペースの数調整した
 fix_date.each do |x|
   new_day = Date.new(day.year, day.month, x.to_i)
-  if new_day.saturday? #土曜日だったら改行
-    print "#{x}\n"
-  else
-    print "#{x} "
-  end
+  x << " "
+  x << "\n" if new_day.saturday?
+  print "#{x}"
 end
 print "\n"
