@@ -16,11 +16,6 @@ end_of_month = Date.new(day.year, day.month, -1)
 first_of_month = Date.new(day.year, day.month, 1)
 date = [*1..end_of_month.day] #今月の日付が入ってる配列
 
-#日付の配列の１桁日付を２桁に調整
-fix_date = date.map do |x|
-  sprintf('%2d', x)
-end
-
 #西暦と月
 print"　　　#{day.month}月 #{day.year}\n"
 #曜日の表示
@@ -28,7 +23,8 @@ print"日 月 火 水 木 金 土\n"
 #日付部分
 day_of_the_week = first_of_month.wday
 print "   " * day_of_the_week #ついたちが何曜日かでスペースの数調整した
-fix_date.each do |x|
+date.each do |x|
+  x = sprintf('%2d', x) #日付の配列の１桁日付を２桁に調整
   new_day = Date.new(day.year, day.month, x.to_i)
   x << " "
   x << "\n" if new_day.saturday?
