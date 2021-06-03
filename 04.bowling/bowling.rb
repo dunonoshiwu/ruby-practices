@@ -1,5 +1,30 @@
 #!/usr/bin/env ruby
 
+def calc_twice_score(point, twice_score, frame)
+  if twice_score == 1 # twice_scoreが1の時
+    point += frame[0]
+    twice_score -= 1
+
+  elsif twice_score == 2 # twice_scoreが2の時
+    if frame[0] == 10
+      point += frame[0]
+      twice_score -= 1
+    else # ストライク以外の場合（二投目もある）
+      point += frame.sum
+      twice_score -= 2
+    end
+
+  elsif frame[0] == 10 # twice_scoreが3以上ある
+    point += frame[0] * 2 # 1個前と2個前のストライクの加算
+    twice_score -= 2
+  else # ストライク以外だった場合（二投目もある)
+    point += frame.sum # 直前のストライクが1投目2投目を加算
+    point += frame[0] # 2個前のストライクが1投目のスコアを加算
+    twice_score -= 3
+  end
+  [point, twice_score]
+end
+
 # スコア取得して配列化
 score = ARGV[0]
 scores = score.split(',')
@@ -7,26 +32,21 @@ scores = score.split(',')
 shots = []
 scores.each do |s|
   if s == 'X' && shots.size < 18 # 9フレーム目までに適用
-    shots << '10'
-    shots << 'buf' # ストライクの出たフレームの2投目に一時的な変数
+    shots << 10
+    shots << nil # ストライクの出たフレームの2投目に一時的にnil
   # 10フレーム目の処理。Xなら10を入れる。
   elsif s == 'X'
-    shots << '10'
+    shots << 10
   else
-    shots << s
+    shots << s.to_i
   end
 end
 
 # スコアを2分割してフレームを作る
-frames = []
-shots.each_slice(2) do |s|
-  frames << s
-end
+frames = shots.each_slice(2).to_a
 
-# "buf"要素を消す
-frames.each do |frame|
-  frame.delete('buf')
-end
+# nil要素を消す
+frames.each(&:compact!)
 
 # 10フレーム目で3投目まで投げてたら10フレーム目の配列に入れる
 unless frames[10].nil?
@@ -36,56 +56,34 @@ unless frames[10].nil?
 end
 
 point = 0
-double_bonus = 0
+twice_score = 0 # ストライク・スペアの次の投球はスコア2倍で計算
 # 1〜9フレームまでの足し算処理
 frames[0..-2].each do |frame|
   # 直前でストライクやスペアがあった場合の追加ポイント加算
-  if double_bonus.positive?
-    if double_bonus == 1 # double_bonusが1の時
-      point += frame[0].to_i
-      double_bonus -= 1
-
-    elsif double_bonus == 2 # double_bonusが2の時
-      if frame[0] == '10'
-        point += frame[0].to_i
-        double_bonus -= 1
-      else # ストライク以外だった場合（二投目もある）
-        point += frame[0].to_i + frame[1].to_i
-        double_bonus -= 2
-      end
-
-    elsif frame[0] == '10' # double_bonusが3以上ある
-      point += frame[0].to_i * 2 # 1個前と2個前のストライクの加算
-      double_bonus -= 2
-    else # ストライク以外だった場合（二投目もある）
-      point += frame[0].to_i + frame[1].to_i # 直前のストライクが1投目2投目を加算
-      point += frame[0].to_i # 2個前のストライクが1投目のスコアを加算
-      double_bonus -= 3
-    end
-  end
+  point, twice_score = calc_twice_score(point, twice_score, frame) if twice_score.positive?
 
   # 通常のポイント加算
-  if frame[0] == '10' # ストライクのとき
+  if frame[0] == 10 # ストライクのとき
     point += 10
-    double_bonus += 2
-  elsif frame[0].to_i + frame[1].to_i == 10 # スペアのとき
+    twice_score += 2
+  elsif frame.sum == 10
     point += 10
-    double_bonus += 1
+    twice_score += 1
   else
-    point += frame[0].to_i + frame[1].to_i
+    point += frame.sum
   end
 end
 
 # 10フレームからの足し算処理
 frames[9].each do |frame|
-  # double_bonusがまだある時の処理
-  if double_bonus.positive?
-    point += frame.to_i
-    double_bonus -= 1
+  # twice_scoreがまだある時の処理
+  if twice_score.positive?
+    point += frame
+    twice_score -= 1
   end
 
   # 通常のポイント加算処理
-  point += frame.to_i
+  point += frame
 end
 
 p point
