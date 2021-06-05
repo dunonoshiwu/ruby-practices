@@ -75,7 +75,11 @@ def output_list_in_long_format(files)
   files_size = files.map { |x| File::Stat.new(x).size.to_s }
   max_width_size = files_size.max_by(&:length)
   max_width = max_width_size.length
+  # total ブロック数を取得
+  total = get_blocks(files)
+  puts "total #{total}"
 
+  # ファイル情報をリスト表示
   files.each do |e|
     element = File::Stat.new(e)
     statmode = element.mode.to_s(8)
@@ -90,6 +94,15 @@ def output_list_in_long_format(files)
     print "#{element.mtime.strftime('%-m %-d %H:%M')} "
     puts File.basename(e)
   end
+end
+
+def get_blocks(files)
+  total = 0
+  files.each do |e|
+    elem = File::Stat.new(e)
+    total += elem.blocks
+  end
+  total
 end
 
 # 配列を逆にする
