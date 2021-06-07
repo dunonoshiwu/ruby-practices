@@ -8,9 +8,9 @@ def main
 
   # 上からそれぞれのオプションの処理を実行、なければオプション無しの処理
   files = if options['a']
-            input_list_including_hidden_files
+            input_list('a')
           else
-            input_list
+            input_list('no')
           end
 
   files = reverse_the_array(files) if options['r']
@@ -23,21 +23,17 @@ def main
 end
 
 # ファイルのパスを配列にいれる
-def input_list
+def input_list(arg)
   files = []
   current_directory = Dir.pwd
-  Dir.glob('*') do |file|
-    files << File.join(current_directory, file)
-  end
-  files
-end
-
-# 隠しファイルも含めたすべてのパスを配列に入れる
-def input_list_including_hidden_files
-  files = []
-  current_directory = Dir.pwd
-  Dir.glob('*', File::FNM_DOTMATCH) do |file|
-    files << File.join(current_directory, file)
+  if arg == 'a'
+    Dir.glob('*', File::FNM_DOTMATCH) do |file|
+      files << File.join(current_directory, file)
+    end
+  else
+    Dir.glob('*') do |file|
+      files << File.join(current_directory, file)
+    end
   end
   files
 end
@@ -47,25 +43,20 @@ def output_list(files)
   # 一番長いファイル名の長さを取得
   file_names = files.map { |x| File.basename(x) }
   max_width_name = file_names.max_by(&:length)
-  max_width = max_width_name.length
+  max_width = max_width_name.length + 1
   # 3列を基準に並べる
   col = 3
   files_sum = files.size
   quotient, remainder = files_sum.divmod(col)
   quotient += 1 if remainder != 0
-  x = 0
-  y = 0
-  quotient.times do # 縦の表示
-    y = x
-    col.times do # 横の表示
-      path = files[y].to_s
-      file_name = File.basename(path)
-      # 一番長いファイル名に合わせてスペース
-      print "#{file_name}#{' ' * (max_width - file_name.length)} "
-      y += quotient # 商の数だけ要素を飛び飛びで取得
+  
+  quotient.times do |x|
+    file_names.each_slice(quotient) do |a| 
+      # 縦の要素で一番多い文字数を取得。スペースのため+1
+      max_width = a.map(&:length).max + 1
+      print a[x].ljust(max_width,' ') unless a[x].instance_of?(NilClass)
     end
-    puts # 改行
-    x += 1 # 縦の要素の順番をリセット
+    puts
   end
 end
 
