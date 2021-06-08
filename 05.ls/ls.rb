@@ -26,24 +26,19 @@ end
 def input_list(arg)
   files = []
   current_directory = Dir.pwd
-  if arg == 'a'
-    Dir.glob('*', File::FNM_DOTMATCH) do |file|
-      files << File.join(current_directory, file)
-    end
-  else
-    Dir.glob('*') do |file|
-      files << File.join(current_directory, file)
-    end
+  option = arg == 'a' ? File::FNM_DOTMATCH : 0
+  Dir.glob('*', option) do |file|
+    files << File.join(current_directory, file)
   end
   files
 end
+
 
 # 列を指定して表示する
 def output_list(files)
   # 一番長いファイル名の長さを取得
   file_names = files.map { |x| File.basename(x) }
-  max_width_name = file_names.max_by(&:length)
-  max_width = max_width_name.length + 1
+  max_width_name = file_names.max_by(&:length).length + 1
   # 3列を基準に並べる
   col = 3
   files_sum = files.size
@@ -64,8 +59,7 @@ end
 def output_list_in_long_format(files)
   # 一番長いファイルサイズの桁数を取得
   files_size = files.map { |x| File::Stat.new(x).size.to_s }
-  max_width_size = files_size.max_by(&:length)
-  max_width = max_width_size.length
+  max_width = files_size.max_by(&:length).length + 1
   # total ブロック数を取得
   total = get_blocks(files)
   puts "total #{total}"
