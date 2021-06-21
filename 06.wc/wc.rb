@@ -3,159 +3,70 @@ require 'optparse'
 
 def main
   options = ARGV.getopts('l')
-  args = ARGV # 引数のファイル名
-  file_info = if args.any? # 引数にファイル名があれば
-                search_file_info(args)
-              elsif File.pipe?($stdin) # パイプで標準入力があれば
-                search_stdin_info
-              else # 引数も標準入力もなければ終了
-                exit
-              end
-  if options['l']
-    output_l_option(file_info) # -l オプション付きの出力
-  else
-    output_no_option(file_info) # オプション無しの普通の出力
-  end
-end
-
-# ファイル情報を取得するメソッド １つのファイル１つのハッシュで返す
-def search_file_info(args)
-  if args.size == 1
-    search_single_file_info(args[0]) # ファイル名が１つのとき, 配列じゃなくて文字列を渡す
-  else
-    search_multi_file_info(args) # ファイル名が２つ以上のとき
-  end
-end
-
-def search_single_file_info(args)
-  file = args
-  file_info = {}
-  words_count = 0
-  bytes_count = 0
-  File.open(file, 'r') do |f|
-    f.each_line do |line|
-      bytes_count += line.to_s.bytesize # 各行のバイト数を加算
-      line.chomp!
-      words = line.split(/\s+/) # それぞれの行で空白で区切って配列化
-      words_count += words.size # 単語数を加算
+  file_info = \
+  if ARGV.any?
+    if ARGV.size == 1 #引数のファイルが１つの場合
+      file = File.read(ARGV[0]) #ファイルの内容をfile変数に代入
+      input_file_info(file, ARGV[0]) #ファイル内容とファイル名を渡す
+    else
+      input_multi_file_info #引数にファイル名が複数の場合
     end
-    file_info[:lines] = f.lineno # IO#lineno 行数を返す
-    file_info[:words] = words_count
-    file_info[:bytes] = bytes_count
-    file_info[:name] = File.basename(file)
-    file_info
+  elsif File.pipe?($stdin) #標準入力がある場合
+    file = $stdin.read #file変数に標準入力を代入
+    input_file_info(file)
+  else
+    exit #引数、標準入力がなければ終了
   end
+  l = options['l'] ? 'yes' : 'no' #オプションあればyes,なければno
+  output_file_info(file_info, l)
 end
 
-# 複数のハッシュを配列に入れて返す
-def search_multi_file_info(args)
-  file_info = []
-  args.each do |arg|
-    file_info << search_single_file_info(arg)
-  end
-  file_info
-end
-
-# 標準入力から行数・単語数・バイト数をハッシュにして返す
-def search_stdin_info
+def input_file_info(file, file_name = nil)
   file_info = {}
-  words_count = 0
-  lines_count = 0
-  bytes_count = 0
-  ARGF.each do |line| # 標準入力のすべての行を取得
-    lines_count += 1
-    bytes_count += line.to_s.bytesize
-    line.chomp!
-    words = line.split(/\s+/) # それぞれの行で空白で区切って配列化
-    words_count += words.size # 単語数を加算
-  end
-  file_info[:lines] = lines_count
-  file_info[:words] = words_count
-  file_info[:bytes] = bytes_count
+  file_info[:lines] = file.scan("\n").size #行数
+  file_info[:words] = file.split(/\s+/).size #単語数
+  file_info[:bytes] = file.bytesize #バイトサイズ
+  file_info[:name] = File.basename(file_name) unless file_name.nil?
   file_info
 end
 
-# ファイル情報を出力するメソッド
-def output_l_option(file_info)
-  if file_info.instance_of?(Array) # 配列だったら（ファイル情報が複数だったら）
-    output_multi_line_l_option(file_info) # ファイル名が１つのとき
+def input_multi_file_info
+  file_info = [] #複数のハッシュ情報を配列で保持する
+  ARGV.each do |f|
+    file = File.read(f)
+    file_name = f
+    file_info << input_file_info(file, file_name)
+  end
+  file_info
+end
+
+def output_single_line(file_hash, l)
+  if l == 'yes' #lオプションがある場合
+    print file_hash[:lines].to_s.rjust(8)
+    print " #{file_hash[:name].to_s.ljust(8)}" if file_hash.key?(:name)
+    puts
+  else #lオプションが無い場合
+    print file_hash[:lines].to_s.rjust(8)
+    print file_hash[:words].to_s.rjust(8)
+    print file_hash[:bytes].to_s.rjust(8)
+    print " #{file_hash[:name].to_s.ljust(8)}" if file_hash.key?(:name)
+    puts
+  end
+end
+
+def output_file_info(file_info, l)
+  if file_info.instance_of?(Array) #引数が配列の場合（ファイル名が複数の場合）
+    total = { lines: 0, words: 0, bytes: 0, name: 'total' }
+    file_info.each do |file|
+      total[:lines] += file[:lines].to_i
+      total[:words] += file[:words].to_i
+      total[:bytes] += file[:bytes].to_i
+      output_single_line(file, l)
+    end
+    output_single_line(total, l) #最後にトータルを1行出力
   else
-    max_width = calc_max_width(file_info)
-    output_single_line_l_option(file_info, max_width) # ファイル名が２つ以上のとき
+    output_single_line(file_info, l)
   end
-end
-
-def output_no_option(file_info)
-  if file_info.instance_of?(Array) # 配列だったら（ファイル情報が複数だったら）
-    output_multi_line(file_info) # ファイル名が１つのとき
-  else
-    max_width = calc_max_width(file_info)
-    output_single_line(file_info, max_width) # ファイル名が２つ以上のとき
-  end
-end
-
-# １行の出力
-def output_single_line(file_hash, max_width)
-  print file_hash[:lines].to_s.rjust(max_width, ' ')
-  print file_hash[:words].to_s.rjust(max_width, ' ')
-  print file_hash[:bytes].to_s.rjust(max_width, ' ')
-  # ハッシュにnameキーがあれば出力。標準出力にはない。
-  print " #{file_hash[:name].ljust(max_width, ' ')}" if file_hash.key?(:name)
-  puts
-end
-
-def output_multi_line(files)
-  total = { lines: 0, words: 0, bytes: 0, name: 'total' }
-  max_width = 0
-  max_width = calc_max_width_files(files)
-  # ファイルごとにファイル情報を出力
-  files.each do |file_hash|
-    total[:lines] += file_hash[:lines].to_i
-    total[:words] += file_hash[:words].to_i
-    total[:bytes] += file_hash[:bytes].to_i
-    output_single_line(file_hash, max_width)
-  end
-  output_single_line(total, max_width) # 最後にtotal出力
-end
-
-def output_single_line_l_option(file_hash, max_width)
-  print file_hash[:lines].to_s.rjust(max_width, ' ')
-  # ハッシュにnameキーがあれば出力。標準出力にはない。
-  print " #{file_hash[:name].ljust(max_width, ' ')}" if file_hash.key?(:name)
-  puts
-end
-
-def output_multi_line_l_option(files)
-  total = { lines: 0, name: 'total' }
-  max_width = 0
-  # すべてのファイルのハッシュの要素で一番長い文字数を計算
-  max_width = calc_max_width_files(files)
-
-  # ファイルごとにファイル情報を出力
-  files.each do |file_hash|
-    total[:lines] += file_hash[:lines].to_i
-    output_single_line_l_option(file_hash, max_width)
-  end
-  output_single_line_l_option(total, max_width) # 最後にtotal出力
-end
-
-# その他メソッド
-# ファイルの情報が入ったハッシュから一番長い文字列を取得
-def calc_max_width(file)
-  max_width = 0
-  file.each do |_key, value|
-    max_width = value.to_s.length + 1 if value.to_s.length >= max_width
-  end
-  max_width
-end
-
-def calc_max_width_files(files)
-  # 複数ファイルが入ったハッシュの要素で一番長い文字数を計算
-  max_width = 0
-  files.each do |hash|
-    max_width = calc_max_width(hash) + 1 if calc_max_width(hash) > max_width
-  end
-  max_width
 end
 
 main
